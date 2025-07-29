@@ -1291,45 +1291,8 @@ class NetworkManagementToolV5:
         status_text.config(state=tk.DISABLED)
 
     def parse_device_status_from_logs(self):
-        """从巡检日志中解析设备状态,完全对标 V3 (extract_device_status.py) 的解析逻辑"""
-        log_dir = filedialog.askdirectory(title="请选择巡检日志文件夹")
-        if not log_dir:
-            return
-                    final_lines.append(line)
-            else:
-                consecutive_empty = 0
-                final_lines.append(line)
-        
-        # 第六步：确保结果格式正确
-        result = '\n'.join(final_lines)
-        
-        # 最终检查：确保结果末尾有换行符
-        if result and not result.endswith('\n'):
-            result += '\n'
-            
-        return result
-
-    def show_device_status(self):
-        if not hasattr(self, 'inspect_device_list') or not self.inspect_device_list:
-            messagebox.showwarning("无设备", "请先导入设备+指令列表！")
-            return
-        
-        status_window = tk.Toplevel(self.root)
-        status_window.title("设备状态")
-        status_text = tk.Text(status_window, wrap="word", font=("微软雅黑", 10))
-        status_text.pack(fill="both", expand=True)
-        
-        for dev in self.inspect_device_list:
-            name = dev.get('name') or dev.get('设备名') or dev.get('设备名称') or dev.get('主机名')
-            ip = dev.get('ip') or dev.get('IP')
-            vendor = (dev.get('vendor') or dev.get('厂商') or '').strip()
-            status_text.insert(tk.END, f"设备名: {name}\nIP: {ip}\n厂商: {vendor}\n状态: 正常\n\n")
-        
-        status_text.config(state=tk.DISABLED)
-
-    def parse_device_status_from_logs(self):
         """
-        从巡检日志中解析设备状态，完全对标 V3 (extract_device_status.py) 的解析逻辑。
+        从巡检日志中解析设备状态，使用 extract_device_status.py 模块
         """
         log_dir = filedialog.askdirectory(title="请选择巡检日志文件夹")
         if not log_dir:
@@ -1346,15 +1309,14 @@ class NetworkManagementToolV5:
                 possible_paths.append(os.path.join(sys._MEIPASS, 'extract_device_status.py'))
             # 当前文件同目录
             if '__file__' in globals():
-                possible_paths.append(os.path.join(os.path.dirname(__file__), '../../extract_device_status.py'))
+                possible_paths.append(os.path.join(os.path.dirname(__file__), 'extract_device_status.py'))
             # 当前工作目录
             possible_paths.append(os.path.abspath('extract_device_status.py'))
             # 程序所在目录
             if hasattr(sys, 'executable') and sys.executable:
                 exe_dir = os.path.dirname(sys.executable)
                 possible_paths.append(os.path.join(exe_dir, 'extract_device_status.py'))
-            # 脚本所在目录的上级目录
-            possible_paths.append(os.path.join(os.getcwd(), '..', 'extract_device_status.py'))
+            # 脚本所在目录
             possible_paths.append(os.path.join(os.getcwd(), 'extract_device_status.py'))
             
             found_path = None
@@ -1367,8 +1329,38 @@ class NetworkManagementToolV5:
                 messagebox.showerror("导入失败", "未找到 extract_device_status.py，请确保该文件与程序在同一目录！")
                 return
                 
-            spec = importlib.util.spec_from_file_location(
+            spec = importlib.util.spec_from_file_location("extract_device_status", found_path)
+            if spec is None or spec.loader is None:
+                messagebox.showerror("导入失败", "无法加载 extract_device_status.py 模块！")
+                return
+                
+            extract_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(extract_module)
             
+            # 使用模块解析日志
+            status_data = extract_module.parse_log_files(log_dir)
+            
+            if not status_data:
+                messagebox.showwarning("解析结果", "未找到可解析的日志文件或解析结果为空！")
+                return
+            
+        except Exception as e:
+            messagebox.showerror("解析失败", f"解析设备状态时发生错误: {e}")
+            return
+
+        # 显示解析结果窗口
+        win = tk.Toplevel(self.root)
+        win.title("设备状态解析结果")
+        win.geometry("1200x600")
+        
+        # 顶部按钮区
+        top_frame = tk.Frame(win)
+        top_frame.pack(fill="x", pady=5)
+        
+        tk.Label(top_frame, text=f"解析完成，共找到 {len(status_data)} 台设备", 
+                font=("微软雅黑", 12, "bold")).pack(side="left", padx=10)
+
+        def export_parsed_data_to_csv():
             save_path = filedialog.asksaveasfilename(
                 title="导出解析结果到CSV",
                 defaultextension=".csv",
@@ -1390,7 +1382,8 @@ class NetworkManagementToolV5:
             except Exception as e:
                 messagebox.showerror("导出失败", f"导出CSV文件时发生错误: {e}")
 
-        tk.Button(top_frame, text="导出为CSV", command=export_parsed_data_to_csv, font=("微软雅黑", 10)).pack(side="left")
+        tk.Button(top_frame, text="导出为CSV", command=export_parsed_data_to_csv, 
+                 font=("微软雅黑", 10)).pack(side="right", padx=10)
 
         # 异常优先排序
         def abnormal_score(row):
@@ -1411,6 +1404,7 @@ class NetworkManagementToolV5:
 
         status_data.sort(key=abnormal_score)
 
+        # 显示结果表格
         columns = ("设备名", "时间", "厂商", "CPU使用率", "内存使用率", "温度状态", "电源状态", "风扇状态", "运行时间")
         tree_frame = tk.Frame(win)
         tree_frame.pack(fill="both", expand=True, padx=10, pady=5)
@@ -1661,67 +1655,6 @@ class NetworkManagementToolV5:
                         mem = 'N/A'
                     if not temp:
                         temp = 'N/A'
-                                # 处理分页符：发送空格键继续分页
-                                if '---- More ----' in data or '--More--' in data:
-                                    chan.send(b' ')
-                                    time.sleep(0.06)
-                                    continue
-                                # Y/N自动应答
-                                if yn_pattern.search(data):
-                                    chan.send(b'n\n')
-                                    time.sleep(0.15)
-                                lines = data.strip().splitlines()
-                                if lines:
-                                    last_line = lines[-1].strip()
-                                    if any(last_line.endswith(p) for p in prompt_list):
-                                        break
-                            else:
-                                empty_count += 1
-                                if empty_count >= max_empty or (time.time() - last_data_time > 8):
-                                    break
-                        output_all += f"\n{cmd.strip()}\n{cmd_output}"
-                    
-                    ssh.close()
-                    status = '在线'
-                except Exception as e:
-                    output_all += f"\n[ERROR] {e}"
-                    status = '离线'
-                # 解析状态（严格对标extract_device_status.py和标准文档，字段名与汇总一致）
-                vendor_detected = vendor
-                info = {}
-                
-                # 优先使用extract_device_status.py解析
-                try:
-                    if found_path is not None:
-                        spec = importlib.util.spec_from_file_location("extract_device_status", found_path)
-                        if spec is not None and spec.loader is not None:
-                            extract_module = importlib.util.module_from_spec(spec)
-                            spec.loader.exec_module(extract_module)
-                            vendor_detected = extract_module.detect_vendor(output_all)
-                            info = extract_module.extract_info(output_all, vendor_detected)
-                except Exception:
-                    pass
-                
-                # 如果extract_device_status.py未能提取到有效信息，使用简化的状态解析
-                if not info or all(not info.get(k) for k in ['cpu', 'mem', 'temp', 'power', 'fan']):
-                    info = self._parse_device_status_fallback(output_all, vendor_detected, status)
-                
-                # 确保所有字段都有值，解析失败时填充N/A
-                cpu = str(info.get('cpu', '')).strip()
-                mem = str(info.get('mem', '')).strip()
-                temp = str(info.get('temp', '')).strip()
-                power = str(info.get('power', '')).strip()
-                fan = str(info.get('fan', '')).strip()
-                uptime = str(info.get('uptime', '')).strip()
-                
-                # 对于在线设备，如果字段为空则填充N/A；对于离线设备，保持空值
-                if status == '在线':
-                    if not cpu:
-                        cpu = 'N/A'
-                    if not mem:
-                        mem = 'N/A'
-                    if not temp:
-                        temp = 'N/A'
                     if not power:
                         power = 'N/A'
                     if not fan:
@@ -1823,7 +1756,93 @@ class NetworkManagementToolV5:
 
     def export_inspect_template(self):
         """导出巡检模板"""
-        pass
+        save_path = filedialog.asksaveasfilename(
+            title="导出巡检设备+指令模板",
+            defaultextension=".csv", 
+            initialfile="inspect_template.csv",
+            filetypes=[("CSV文件", "*.csv")]
+        )
+        if save_path:
+            try:
+                # 创建巡检模板，包含设备信息和命令列
+                headers = [
+                    'name',       # 设备名
+                    'ip',         # IP地址
+                    'username',   # 用户名
+                    'password',   # 密码
+                    'port',       # 端口
+                    'vendor',     # 厂商
+                    'description', # 描述
+                    'cmd1',       # 命令1
+                    'cmd2',       # 命令2
+                    'cmd3',       # 命令3
+                    'cmd4',       # 命令4
+                    'cmd5'        # 命令5
+                ]
+                
+                # 示例数据
+                sample_data = [
+                    {
+                        'name': '核心交换机-示例',
+                        'ip': '192.168.1.1',
+                        'username': 'admin',
+                        'password': 'password',
+                        'port': '22',
+                        'vendor': 'huawei',
+                        'description': '核心交换机示例',
+                        'cmd1': 'display cpu-usage',
+                        'cmd2': 'display memory-usage',
+                        'cmd3': 'display temperature',
+                        'cmd4': 'display power',
+                        'cmd5': 'display fan'
+                    },
+                    {
+                        'name': '接入交换机-示例',
+                        'ip': '192.168.1.2', 
+                        'username': 'admin',
+                        'password': 'password',
+                        'port': '22',
+                        'vendor': 'h3c',
+                        'description': '接入交换机示例',
+                        'cmd1': 'display cpu-usage',
+                        'cmd2': 'display memory',
+                        'cmd3': 'display environment',
+                        'cmd4': 'display power',
+                        'cmd5': 'display fan'
+                    },
+                    {
+                        'name': '路由器-示例',
+                        'ip': '192.168.1.3',
+                        'username': 'admin',
+                        'password': 'password',
+                        'port': '22',
+                        'vendor': 'cisco',
+                        'description': '路由器示例',
+                        'cmd1': 'show processes cpu',
+                        'cmd2': 'show processes memory',
+                        'cmd3': 'show environment temperature',
+                        'cmd4': 'show environment power',
+                        'cmd5': 'show environment fan'
+                    }
+                ]
+                
+                with open(save_path, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=headers)
+                    writer.writeheader()
+                    writer.writerows(sample_data)
+                
+                messagebox.showinfo("导出成功", 
+                    f"巡检模板已导出到: {save_path}\n\n"
+                    "模板说明:\n"
+                    "• name: 设备名称\n"
+                    "• ip: 设备IP地址\n"
+                    "• username/password: 登录凭据\n"
+                    "• port: SSH端口(默认22)\n"
+                    "• vendor: 厂商(huawei/h3c/cisco/ruijie)\n"
+                    "• cmd1-cmd5: 巡检命令(可根据需要修改)")
+                    
+            except Exception as e:
+                messagebox.showerror("导出失败", f"导出巡检模板失败: {e}")
 
     def export_monitor_log(self):
         """导出监控日志"""

@@ -24,8 +24,8 @@ def build_v6_win7_concurrent():
     os.chdir(script_dir)
     
     # 检查源文件
-    main_file = os.path.join("src", "main_v6_final_win7 copy.py")
-    extract_file = os.path.join("..", "extract_device_status.py")
+    main_file = "main_v6_final_win7 copy.py"
+    extract_file = "extract_device_status.py"
     
     if not os.path.exists(main_file):
         print(f"❌ 主程序文件不存在: {main_file}")
@@ -58,12 +58,12 @@ def build_v6_win7_concurrent():
 import os
 
 # 获取源文件路径
-src_dir = r"{os.path.abspath('src')}"
+main_file = r"{os.path.abspath(main_file)}"
 extract_file = r"{os.path.abspath(extract_file)}"
 
 a = Analysis(
-    [r"{os.path.abspath(main_file)}"],
-    pathex=[src_dir],
+    [main_file],
+    pathex=[r"{os.path.abspath('.')}"],
     binaries=[],
     datas=[
         # 重要：将extract_device_status.py打包进exe
