@@ -1,0 +1,4 @@
+name,ip,username,password,port,vendor,description,cmd1,cmd2,cmd3,cmd4,cmd5
+核心交换机-示例,192.168.1.1,admin,password,22,huawei,核心交换机示例,display cpu-usage,display memory-usage,display temperature,display power,display fan
+接入交换机-示例,192.168.1.2,admin,password,22,h3c,接入交换机示例,display cpu-usage,display memory,display environment,display power,display fan
+路由器-示例,192.168.1.3,admin,password,22,cisco,路由器示例,show processes cpu,show processes memory,show environment temperature,show environment power,show environment fan

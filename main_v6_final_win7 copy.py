@@ -1476,7 +1476,7 @@ class NetworkManagementToolV5:
                 possible_paths.append(os.path.join(sys._MEIPASS, 'extract_device_status.py'))
             # 当前文件同目录
             if '__file__' in globals():
-                possible_paths.append(os.path.join(os.path.dirname(__file__), '../../extract_device_status.py'))
+                possible_paths.append(os.path.join(os.path.dirname(__file__), 'extract_device_status.py'))
             # 当前工作目录
             possible_paths.append(os.path.abspath('extract_device_status.py'))
             # 程序所在目录

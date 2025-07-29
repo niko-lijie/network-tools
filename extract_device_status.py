@@ -74,8 +74,9 @@ def extract_info(output, vendor):
 def extract_huawei_info(output, info):
     """提取华为设备状态信息"""
     
-    # CPU使用率解析
+    # CPU使用率解析 - 改进的模式匹配
     cpu_patterns = [
+        r'cpu usage in the last (?:5 seconds|1 minute|5 minutes):\s*(\d+)%',
         r'cpu usage:\s*(\d+)%',
         r'cpu utilization:\s*(\d+)%',
         r'cpu\s+usage\s+in\s+last\s+.*?:\s*(\d+)%'
@@ -83,19 +84,26 @@ def extract_huawei_info(output, info):
     for pattern in cpu_patterns:
         matches = re.findall(pattern, output, re.IGNORECASE)
         if matches:
+            # 取第一个匹配的值
             info['cpu'] = f"{matches[0]}%"
             break
     
-    # 内存使用率解析
+    # 内存使用率解析 - 改进的模式匹配
     mem_patterns = [
         r'memory usage:\s*(\d+)%',
         r'memory utilization:\s*(\d+)%',
-        r'used\s*:\s*\d+.*?\((\d+)%\)'
+        r'used\s*:\s*\d+.*?\((\d+)%\)',
+        r'free memory:\s*(\d+)%'  # 如果只有free memory，计算used
     ]
     for pattern in mem_patterns:
         matches = re.findall(pattern, output, re.IGNORECASE)
         if matches:
-            info['mem'] = f"{matches[0]}%"
+            if 'free memory' in pattern:
+                # 如果是free memory，计算used = 100 - free
+                used = 100 - int(matches[0])
+                info['mem'] = f"{used}%"
+            else:
+                info['mem'] = f"{matches[0]}%"
             break
     
     # 温度状态解析
@@ -233,11 +241,12 @@ def extract_h3c_info(output, info):
 def extract_cisco_info(output, info):
     """提取思科设备状态信息"""
     
-    # CPU使用率解析
+    # CPU使用率解析 - 改进的模式匹配
     cpu_patterns = [
-        r'cpu utilization.*?(\d+)%',
+        r'cpu utilization for five seconds:\s*(\d+)%',
         r'five seconds:\s*(\d+)%',
-        r'one minute:\s*(\d+)%'
+        r'one minute:\s*(\d+)%',
+        r'cpu utilization.*?(\d+)%'
     ]
     for pattern in cpu_patterns:
         matches = re.findall(pattern, output, re.IGNORECASE)
@@ -245,7 +254,7 @@ def extract_cisco_info(output, info):
             info['cpu'] = f"{matches[0]}%"
             break
     
-    # 内存使用率解析
+    # 内存使用率解析 - 改进的计算逻辑
     mem_patterns = [
         r'processor pool total:\s*(\d+).*?used:\s*(\d+)',
         r'memory usage:\s*(\d+)%'
@@ -255,8 +264,11 @@ def extract_cisco_info(output, info):
         if matches:
             if len(matches[0]) == 2:  # total and used format
                 total, used = matches[0]
-                percentage = int((int(used) / int(total)) * 100)
-                info['mem'] = f"{percentage}%"
+                try:
+                    percentage = int((int(used) / int(total)) * 100)
+                    info['mem'] = f"{percentage}%"
+                except (ValueError, ZeroDivisionError):
+                    info['mem'] = 'N/A'
             else:
                 info['mem'] = f"{matches[0]}%"
             break
