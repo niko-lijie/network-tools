@@ -24,8 +24,8 @@ def build_v6_win7_concurrent():
     os.chdir(script_dir)
     
     # 检查源文件
-    main_file = os.path.join("src", "main_v6_final_win7 copy.py")
-    extract_file = os.path.join("..", "extract_device_status.py")
+    main_file = "main_v6_final_win7 copy.py"
+    extract_file = "extract_device_status.py"
     
     if not os.path.exists(main_file):
         print(f"❌ 主程序文件不存在: {main_file}")
@@ -58,12 +58,12 @@ def build_v6_win7_concurrent():
 import os
 
 # 获取源文件路径
-src_dir = r"{os.path.abspath('src')}"
+main_file = r"{os.path.abspath(main_file)}"
 extract_file = r"{os.path.abspath(extract_file)}"
 
 a = Analysis(
-    [r"{os.path.abspath(main_file)}"],
-    pathex=[src_dir],
+    [main_file],
+    pathex=[r"{os.path.abspath('.')}"],
     binaries=[],
     datas=[
         # 重要：将extract_device_status.py打包进exe
@@ -148,9 +148,17 @@ exe = EXE(
             
             # 检查输出文件
             exe_file = os.path.join("dist", "网络管理工具V6-Win7-并发增强版-完整版.exe")
+            exe_file_linux = os.path.join("dist", "网络管理工具V6-Win7-并发增强版-完整版")
+            
+            actual_file = None
             if os.path.exists(exe_file):
-                file_size = os.path.getsize(exe_file) / (1024 * 1024)  # MB
-                print(f"✅ 输出文件: {exe_file}")
+                actual_file = exe_file
+            elif os.path.exists(exe_file_linux):
+                actual_file = exe_file_linux
+            
+            if actual_file:
+                file_size = os.path.getsize(actual_file) / (1024 * 1024)  # MB
+                print(f"✅ 输出文件: {actual_file}")
                 print(f"✅ 文件大小: {file_size:.1f} MB")
                 
                 # 验证extract_device_status.py是否被打包
